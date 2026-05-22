@@ -1,0 +1,122 @@
+/* БАЗА */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    background: #f5f5f5;
+}
+
+h1 {
+    padding: 20px;
+    margin: 0;
+}
+
+/* LAYOUT */
+.container {
+    display: flex;
+    gap: 20px;
+    padding: 20px;
+}
+
+.form-section,
+.list-section {
+    flex: 1;
+    background: #fff;
+    padding: 15px;
+    border-radius: 8px;
+}
+
+/* ФОРМА */
+label {
+    display: block;
+    margin-top: 10px;
+    font-weight: bold;
+}
+
+input,
+select,
+textarea {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+/* КНОПКИ */
+button {
+    margin-top: 10px;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+button[type="submit"] {
+    background: #4CAF50;
+    color: white;
+}
+
+button[type="button"] {
+    background: #ccc;
+}
+
+/* ПОМИЛКИ */
+.error {
+    color: red;
+    font-size: 12px;
+    min-height: 14px;
+}
+
+.invalid {
+    border: 1px solid red;
+    background: #ffe6e6;
+}
+
+/* СПИСОК */
+.list-section input,
+.list-section select {
+    margin-bottom: 10px;
+}
+
+/* ТАБЛИЦЯ */
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th {
+    background: #eee;
+}
+
+th,
+td {
+    border: 1px solid #ccc;
+    padding: 8px;
+    text-align: left;
+}
+
+/* КНОПКИ В ТАБЛИЦІ */
+td button {
+    margin-right: 5px;
+    padding: 5px 8px;
+}
+
+td .edit {
+    background: #2196F3;
+    color: white;
+}
+
+td .delete {
+    background: #f44336;
+    color: white;
+}
