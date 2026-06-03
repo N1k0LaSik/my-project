@@ -8,6 +8,8 @@ import { statusRoutes } from "./routes/status.routes";
 import { ticketRoutes } from "./routes/ticket.routes";
 import { ticketMessageRoutes } from "./routes/ticket-message.routes";
 import { swaggerDocument } from "./swagger";
+import { analyticsRoutes } from "./routes/analytics.routes";
+import { exportImportRoutes } from "./routes/export-import.routes";
 
 export const app = express();
 
@@ -27,3 +29,6 @@ app.use("/api/tickets", ticketRoutes);
 app.use("/api/tickets/:ticketId/messages", ticketMessageRoutes);
 
 app.use(errorHandler);
+
+app.use("/api/analytics", analyticsRoutes);
+app.use("/api", exportImportRoutes);

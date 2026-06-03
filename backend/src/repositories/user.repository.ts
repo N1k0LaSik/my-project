@@ -1,31 +1,40 @@
+import { all, get, run } from "../db/dbClient";
 import { User } from "../models/user.model";
 
-const users: User[] = [];
-
-
 export const UserRepository = {
-  findAll: () => users,
-
-  findById: (id: string) => users.find(u => u.id === id),
-
-  create: (user: User) => {
-    users.push(user);
-    return user;
+  findAll: (): Promise<User[]> => {
+    return all<User>("SELECT id, name, email, createdAt FROM Users ORDER BY createdAt DESC;");
   },
 
-  update: (id: string, data: Partial<User>) => {
-    const user = users.find(u => u.id === id);
-    if (!user) return null;
-
-    Object.assign(user, data);
-    return user;
+  findById: (id: string): Promise<User | undefined> => {
+    return get<User>(`SELECT id, name, email, createdAt FROM Users WHERE id = '${id}';`);
   },
 
-  delete: (id: string) => {
-    const index = users.findIndex(u => u.id === id);
-    if (index === -1) return false;
+  findByEmail: (email: string): Promise<User | undefined> => {
+    return get<User>(`SELECT id, name, email, createdAt FROM Users WHERE email = '${email}';`);
+  },
 
-    users.splice(index, 1);
-    return true;
-  }
+  create: async (user: User): Promise<User> => {
+    await run(`
+      INSERT INTO Users (id, name, email, createdAt)
+      VALUES ('${user.id}', '${user.name.replace(/'/g, "''")}', '${user.email.replace(/'/g, "''")}', '${user.createdAt}');
+    `);
+    return (await get<User>(`SELECT id, name, email, createdAt FROM Users WHERE id = '${user.id}';`))!;
+  },
+
+  update: async (id: string, data: Partial<User>): Promise<User | null> => {
+    const fields: string[] = [];
+    if (data.name !== undefined) fields.push(`name = '${data.name.replace(/'/g, "''")}'`);
+    if (data.email !== undefined) fields.push(`email = '${data.email.replace(/'/g, "''")}'`);
+    if (fields.length === 0) return null;
+
+    const result = await run(`UPDATE Users SET ${fields.join(", ")} WHERE id = '${id}';`);
+    if (result.changes === 0) return null;
+    return (await get<User>(`SELECT id, name, email, createdAt FROM Users WHERE id = '${id}';`)) ?? null;
+  },
+
+  delete: async (id: string): Promise<boolean> => {
+    const result = await run(`DELETE FROM Users WHERE id = '${id}';`);
+    return result.changes > 0;
+  },
 };

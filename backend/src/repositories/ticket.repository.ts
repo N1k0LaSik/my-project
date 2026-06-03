@@ -1,6 +1,5 @@
+import { all, get, run } from "../db/dbClient";
 import { Ticket } from "../models/ticket.model";
-
-const tickets: Ticket[] = [];
 
 export type TicketFilters = {
   statusId?: string;
@@ -13,68 +12,92 @@ export type TicketFilters = {
 };
 
 export const TicketRepository = {
-  findAll: (filters: TicketFilters = {}) => {
-    let result = tickets.filter(t => t.deletedAt === null);
+  findAll: async (filters: TicketFilters = {}): Promise<{ items: Ticket[]; total: number }> => {
+    const conditions: string[] = ["deletedAt IS NULL"];
 
-    // Фільтрація
-    if (filters.statusId) {
-      result = result.filter(t => t.statusId === filters.statusId);
+    if (filters.statusId) conditions.push(`statusId = '${filters.statusId}'`);
+    if (filters.priority) conditions.push(`priority = '${filters.priority}'`);
+    if (filters.authorId) conditions.push(`authorId = '${filters.authorId}'`);
+
+    const where = `WHERE ${conditions.join(" AND ")}`;
+
+    const priorityOrder = `CASE priority WHEN 'Low' THEN 1 WHEN 'Medium' THEN 2 WHEN 'High' THEN 3 END`;
+    let orderBy = "ORDER BY createdAt DESC";
+    if (filters.sortBy) {
+      const dir = filters.sortDir === "desc" ? "DESC" : "ASC";
+      const col = filters.sortBy === "priority" ? priorityOrder : filters.sortBy;
+      orderBy = `ORDER BY ${col} ${dir}`;
     }
-    if (filters.priority) {
-      result = result.filter(t => t.priority === filters.priority);
-    }
-    if (filters.authorId) {
-      result = result.filter(t => t.authorId === filters.authorId);
-    }
 
-    // Сортування
-  if (filters.sortBy) {
-      const dir = filters.sortDir === "desc" ? -1 : 1;
-      const priorityOrder: Record<string, number> = { Low: 1, Medium: 2, High: 3 };
+    const countRow = await get<{ total: number }>(
+      `SELECT COUNT(*) as total FROM Tickets ${where};`
+    );
+    const total = countRow?.total ?? 0;
 
-      result = [...result].sort((a, b) => {
-          if (filters.sortBy === "priority") {
-              const aVal = priorityOrder[a.priority] ?? 0;
-              const bVal = priorityOrder[b.priority] ?? 0;
-              return (aVal - bVal) * dir;
-          }
-          const aVal = a[filters.sortBy!];
-          const bVal = b[filters.sortBy!];
-          return aVal < bVal ? -dir : aVal > bVal ? dir : 0;
-      });
-  }
-
-    const total = result.length;
-
-    // Пагінація
+    let limitOffset = "";
     if (filters.page !== undefined && filters.pageSize !== undefined) {
-      const start = (filters.page - 1) * filters.pageSize;
-      result = result.slice(start, start + filters.pageSize);
+      const offset = (filters.page - 1) * filters.pageSize;
+      limitOffset = `LIMIT ${filters.pageSize} OFFSET ${offset}`;
     }
 
-    return { items: result, total };
+    const items = await all<Ticket>(
+      `SELECT id, subject, message, priority, statusId, authorId, createdAt, updatedAt, deletedAt
+       FROM Tickets ${where} ${orderBy} ${limitOffset};`
+    );
+
+    return { items, total };
   },
 
-  findById: (id: string) =>
-    tickets.find(t => t.id === id && t.deletedAt === null),
-
-  create: (ticket: Ticket) => {
-    tickets.push(ticket);
-    return ticket;
+  findById: (id: string): Promise<Ticket | undefined> => {
+    return get<Ticket>(
+      `SELECT id, subject, message, priority, statusId, authorId, createdAt, updatedAt, deletedAt
+       FROM Tickets WHERE id = '${id}' AND deletedAt IS NULL;`
+    );
   },
 
-  update: (id: string, data: Partial<Omit<Ticket, "id" | "createdAt" | "deletedAt">>) => {
-    const ticket = tickets.find(t => t.id === id && t.deletedAt === null);
-    if (!ticket) return null;
-    Object.assign(ticket, data);
-    return ticket;
+  create: async (ticket: Ticket): Promise<Ticket> => {
+    await run(`
+      INSERT INTO Tickets (id, subject, message, priority, statusId, authorId, createdAt, updatedAt, deletedAt)
+      VALUES (
+        '${ticket.id}',
+        '${ticket.subject.replace(/'/g, "''")}',
+        '${ticket.message.replace(/'/g, "''")}',
+        '${ticket.priority}',
+        '${ticket.statusId}',
+        '${ticket.authorId}',
+        '${ticket.createdAt}',
+        '${ticket.updatedAt}',
+        NULL
+      );
+    `);
+    return (await get<Ticket>(
+      `SELECT id, subject, message, priority, statusId, authorId, createdAt, updatedAt, deletedAt
+       FROM Tickets WHERE id = '${ticket.id}';`
+    ))!;
   },
 
-  // Soft delete
-  softDelete: (id: string) => {
-      const ticket = tickets.find(t => t.id === id && t.deletedAt === null);
-      if (!ticket) return false;
-      ticket.deletedAt = new Date().toISOString();
-      return true;
+  update: async (id: string, data: Partial<Omit<Ticket, "id" | "createdAt" | "deletedAt">>): Promise<Ticket | null> => {
+    const fields: string[] = [];
+    if (data.subject !== undefined) fields.push(`subject = '${data.subject.replace(/'/g, "''")}'`);
+    if (data.message !== undefined) fields.push(`message = '${data.message.replace(/'/g, "''")}'`);
+    if (data.priority !== undefined) fields.push(`priority = '${data.priority}'`);
+    if (data.statusId !== undefined) fields.push(`statusId = '${data.statusId}'`);
+    if (data.updatedAt !== undefined) fields.push(`updatedAt = '${data.updatedAt}'`);
+    if (fields.length === 0) return null;
+
+    const result = await run(`UPDATE Tickets SET ${fields.join(", ")} WHERE id = '${id}' AND deletedAt IS NULL;`);
+    if (result.changes === 0) return null;
+    return (await get<Ticket>(
+      `SELECT id, subject, message, priority, statusId, authorId, createdAt, updatedAt, deletedAt
+       FROM Tickets WHERE id = '${id}';`
+    )) ?? null;
+  },
+
+  softDelete: async (id: string): Promise<boolean> => {
+    const now = new Date().toISOString();
+    const result = await run(
+      `UPDATE Tickets SET deletedAt = '${now}' WHERE id = '${id}' AND deletedAt IS NULL;`
+    );
+    return result.changes > 0;
   },
 };

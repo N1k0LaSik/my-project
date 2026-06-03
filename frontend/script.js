@@ -36,6 +36,17 @@ const message = document.getElementById("message");
 const authorSelect = document.getElementById("author");
 const emailInput = document.getElementById("email");
 
+
+document.querySelector("button[type='submit']").disabled = true;
+
+subject.addEventListener("input", checkFormFilled);
+statusSelect.addEventListener("change", checkFormFilled);
+priority.addEventListener("change", checkFormFilled);
+message.addEventListener("input", checkFormFilled);
+authorSelect.addEventListener("input", checkFormFilled);
+emailInput.addEventListener("input", checkFormFilled);
+
+
 // ================= LOAD DROPDOWNS =================
 async function loadDropdowns() {
     statuses = (await apiFetch("/statuses")).items;
@@ -155,6 +166,7 @@ async function addOrUpdateItem(data) {
 
     await loadTickets();
     form.reset();
+    document.querySelector("button[type='submit']").disabled = true;
     await loadDropdowns();
     subject.focus();
 }
@@ -176,6 +188,8 @@ function startEdit(id) {
     emailInput.value = users.find(u => u.id === item.authorId)?.email ?? "";
 
     editId = id;
+
+    checkFormFilled();
 }
 
 // ================= LOAD TICKETS =================
@@ -254,6 +268,21 @@ tableBody.addEventListener("click", async (e) => {
         startEdit(id);
     }
 });
+
+
+function checkFormFilled() {
+    const data = readForm();
+    const filled = 
+        data.subject.length >= 3 &&
+        data.statusId !== "" &&
+        data.priority !== "" &&
+        data.message.length >= 10 &&
+        data.authorId.length >= 2 &&
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email);
+
+    document.querySelector("button[type='submit']").disabled = !filled;
+}
+
 
 
 // ================= INIT =================

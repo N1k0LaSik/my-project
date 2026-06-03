@@ -8,31 +8,18 @@ function toDto(s: { id: string; name: string; color: string }): StatusResponseDt
   return { id: s.id, name: s.name, color: s.color };
 }
 
-export const getStatuses = (_req: Request, res: Response) => {
-  const all = StatusService.getAll();
-  return res.status(200).json({ items: all.map(toDto), total: all.length });
-};
-
-export const getStatusById = (req: Request, res: Response, next: NextFunction) => {
-  const status = StatusService.getById(String(req.params.id));
-  if (!status) return next(new ApiError(404, "NOT_FOUND", "Status not found"));
-  return res.status(200).json(toDto(status));
-};
-
-export const createStatus = (req: Request, res: Response, next: NextFunction) => {
+export const getStatuses = async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const dto = validateCreateStatusDto(req.body);
-    const status = StatusService.create(dto);
-    return res.status(201).json(toDto(status));
+    const all = await StatusService.getAll();
+    return res.status(200).json({ items: all.map(toDto), total: all.length });
   } catch (err) {
     return next(err);
   }
 };
 
-export const updateStatus = (req: Request, res: Response, next: NextFunction) => {
+export const getStatusById = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const dto = validateUpdateStatusDto(req.body);
-    const status = StatusService.update(String(req.params.id), dto);
+    const status = await StatusService.getById(String(req.params.id));
     if (!status) return next(new ApiError(404, "NOT_FOUND", "Status not found"));
     return res.status(200).json(toDto(status));
   } catch (err) {
@@ -40,8 +27,33 @@ export const updateStatus = (req: Request, res: Response, next: NextFunction) =>
   }
 };
 
-export const deleteStatus = (req: Request, res: Response, next: NextFunction) => {
-  const deleted = StatusService.delete(String(req.params.id));
-  if (!deleted) return next(new ApiError(404, "NOT_FOUND", "Status not found"));
-  return res.status(204).send();
+export const createStatus = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const dto = validateCreateStatusDto(req.body);
+    const status = await StatusService.create(dto);
+    return res.status(201).json(toDto(status));
+  } catch (err) {
+    return next(err);
+  }
+};
+
+export const updateStatus = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const dto = validateUpdateStatusDto(req.body);
+    const status = await StatusService.update(String(req.params.id), dto);
+    if (!status) return next(new ApiError(404, "NOT_FOUND", "Status not found"));
+    return res.status(200).json(toDto(status));
+  } catch (err) {
+    return next(err);
+  }
+};
+
+export const deleteStatus = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const deleted = await StatusService.delete(String(req.params.id));
+    if (!deleted) return next(new ApiError(404, "NOT_FOUND", "Status not found"));
+    return res.status(204).send();
+  } catch (err) {
+    return next(err);
+  }
 };

@@ -120,3 +120,10 @@ td .delete {
     background: #f44336;
     color: white;
 }
+
+button[type="submit"]:disabled {
+    background-color: #ccc;
+    color: #888;
+    cursor: not-allowed;
+    border: 1px solid #bbb;
+}

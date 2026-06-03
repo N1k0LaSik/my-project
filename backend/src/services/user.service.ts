@@ -11,8 +11,8 @@ export const UserService = {
     const user = {
       id: uuid(),
       ...dto,
+      createdAt: new Date().toISOString(),
     };
-
     return UserRepository.create(user);
   },
 

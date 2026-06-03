@@ -1,22 +1,40 @@
+import { all, get, run } from "../db/dbClient";
 import { TicketMessage } from "../models/ticket-message.model";
 
-const messages: TicketMessage[] = [];
-
 export const TicketMessageRepository = {
-  findByTicketId: (ticketId: string) =>
-    messages.filter(m => m.ticketId === ticketId),
-
-  findById: (id: string) => messages.find(m => m.id === id),
-
-  create: (message: TicketMessage) => {
-    messages.push(message);
-    return message;
+  findByTicketId: (ticketId: string): Promise<TicketMessage[]> => {
+    return all<TicketMessage>(
+      `SELECT id, ticketId, authorId, content, createdAt
+       FROM TicketMessages WHERE ticketId = '${ticketId}' ORDER BY createdAt ASC;`
+    );
   },
 
-  delete: (id: string) => {
-    const index = messages.findIndex(m => m.id === id);
-    if (index === -1) return false;
-    messages.splice(index, 1);
-    return true;
+  findById: (id: string): Promise<TicketMessage | undefined> => {
+    return get<TicketMessage>(
+      `SELECT id, ticketId, authorId, content, createdAt
+       FROM TicketMessages WHERE id = '${id}';`
+    );
+  },
+
+  create: async (message: TicketMessage): Promise<TicketMessage> => {
+    await run(`
+      INSERT INTO TicketMessages (id, ticketId, authorId, content, createdAt)
+      VALUES (
+        '${message.id}',
+        '${message.ticketId}',
+        '${message.authorId}',
+        '${message.content.replace(/'/g, "''")}',
+        '${message.createdAt}'
+      );
+    `);
+    return (await get<TicketMessage>(
+      `SELECT id, ticketId, authorId, content, createdAt
+       FROM TicketMessages WHERE id = '${message.id}';`
+    ))!;
+  },
+
+  delete: async (id: string): Promise<boolean> => {
+    const result = await run(`DELETE FROM TicketMessages WHERE id = '${id}';`);
+    return result.changes > 0;
   },
 };

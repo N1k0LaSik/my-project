@@ -1,265 +1,252 @@
-Система тікетів технічної підтримки
-REST API для управління заявками в техпідтримку, побудований на Node.js + TypeScript + Express.
+# Система тікетів технічної підтримки
+
+REST API для управління заявками в техпідтримку, побудований на Node.js + TypeScript + Express + SQLite.
+
 ---
-Запуск проекту
-Встановлення залежностей:
+
+## Запуск проекту
+
+### Встановлення залежностей:
 ```bash
 npm install
 ```
-Запуск в режимі розробки:
+
+### Запуск в режимі розробки:
 ```bash
 npm run dev
 ```
-Компіляція:
+
+При запуску автоматично:
+1. Відкривається SQLite база даних (`backend/data/app.db`)
+2. Застосовуються всі міграції зі схемою БД
+3. Запускається сервер на `http://localhost:3000`
+
+### Наповнення бази тестовими даними (seed):
+```bash
+npm run seed
+```
+Створює 3 користувачів, 4 статуси, 5 тікетів, 4 повідомлення.
+
+### Компіляція:
 ```bash
 npm run build
 ```
-Запуск production збірки:
+
+### Запуск production збірки:
 ```bash
 npm start
 ```
-Запуск тестів:
+
+### Запуск тестів:
 ```bash
 npm test
 ```
-Сервер запускається на `http://localhost:3000`
+
+Сервер запускається на `http://localhost:3000`  
 Документація Swagger: `http://localhost:3000/api-docs`
+
 ---
-Реалізовані сутності
-Users — користувачі системи
-Statuses — статуси тікетів
-Tickets — заявки в техпідтримку
-Ticket Messages — повідомлення до тікетів
+
+## База даних
+
+SQLite файл зберігається локально: `backend/data/app.db`  
+Файл не комітиться в репозиторій (додано в `.gitignore`).
+
+### Схема БД
+
+#### Таблиці та зв'язки
+
+**Users**
+| Поле | Тип | Обмеження |
+|------|-----|-----------|
+| id | TEXT | PRIMARY KEY |
+| name | TEXT | NOT NULL |
+| email | TEXT | NOT NULL, UNIQUE |
+| createdAt | TEXT | NOT NULL |
+
+**Statuses**
+| Поле | Тип | Обмеження |
+|------|-----|-----------|
+| id | TEXT | PRIMARY KEY |
+| name | TEXT | NOT NULL, UNIQUE |
+| color | TEXT | NOT NULL |
+
+**Tickets**
+| Поле | Тип | Обмеження |
+|------|-----|-----------|
+| id | TEXT | PRIMARY KEY |
+| subject | TEXT | NOT NULL |
+| message | TEXT | NOT NULL |
+| priority | TEXT | NOT NULL, CHECK (Low/Medium/High) |
+| statusId | TEXT | NOT NULL, FK → Statuses(id) ON DELETE RESTRICT |
+| authorId | TEXT | NOT NULL, FK → Users(id) ON DELETE RESTRICT |
+| createdAt | TEXT | NOT NULL |
+| updatedAt | TEXT | NOT NULL |
+| deletedAt | TEXT | NULL (soft delete) |
+
+**TicketMessages**
+| Поле | Тип | Обмеження |
+|------|-----|-----------|
+| id | TEXT | PRIMARY KEY |
+| ticketId | TEXT | NOT NULL, FK → Tickets(id) ON DELETE CASCADE |
+| authorId | TEXT | NOT NULL, FK → Users(id) ON DELETE RESTRICT |
+| content | TEXT | NOT NULL |
+| createdAt | TEXT | NOT NULL |
+
+#### Зв'язки
+- `Users` 1:N `Tickets` (один користувач — багато тікетів)
+- `Statuses` 1:N `Tickets` (один статус — багато тікетів)
+- `Tickets` 1:N `TicketMessages` (один тікет — багато повідомлень)
+- `Users` 1:N `TicketMessages` (один користувач — багато повідомлень)
+
+#### Поведінка при видаленні
+- Видалення User або Status заборонено якщо є пов'язані тікети (`ON DELETE RESTRICT`)
+- Видалення Ticket каскадно видаляє всі його повідомлення (`ON DELETE CASCADE`)
+- Тікети видаляються через soft delete (поле `deletedAt`)
+
+### Міграції
+
+Схема БД версіонується через систему міграцій у папці `backend/migrations/`:
+- `001_create_users.sql`
+- `002_create_statuses.sql`
+- `003_create_tickets.sql`
+- `004_create_ticket_messages.sql`
+- `005_add_indexes.sql`
+
+Таблиця `schema_migrations` зберігає які міграції вже застосовано. При кожному запуску застосовуються тільки нові.
+
 ---
-Демонстрація API
-> Всі команди виконуються в PowerShell при запущеному сервері.
-> Де написано СЮДИ_ID — підставити реальний id з попередньої відповіді.
+
+## Endpoints
+
+### Users
+| Метод | URL | Опис |
+|-------|-----|------|
+| GET | /api/users | Список всіх користувачів |
+| GET | /api/users/:id | Користувач за id |
+| POST | /api/users | Створити користувача |
+| PUT | /api/users/:id | Оновити користувача |
+| DELETE | /api/users/:id | Видалити користувача |
+
+### Statuses
+| Метод | URL | Опис |
+|-------|-----|------|
+| GET | /api/statuses | Список всіх статусів |
+| GET | /api/statuses/:id | Статус за id |
+| POST | /api/statuses | Створити статус |
+| PUT | /api/statuses/:id | Оновити статус |
+| DELETE | /api/statuses/:id | Видалити статус |
+
+### Tickets
+| Метод | URL | Опис |
+|-------|-----|------|
+| GET | /api/tickets | Список тікетів (фільтрація, сортування, пагінація) |
+| GET | /api/tickets/:id | Тікет за id |
+| POST | /api/tickets | Створити тікет |
+| PUT | /api/tickets/:id | Оновити тікет |
+| PATCH | /api/tickets/:id | Часткове оновлення |
+| DELETE | /api/tickets/:id | Soft delete тікету |
+
+#### Параметри фільтрації для GET /api/tickets:
+- `?statusId=` — фільтр за статусом
+- `?priority=` — фільтр за пріоритетом (Low/Medium/High)
+- `?authorId=` — фільтр за автором
+- `?sortBy=createdAt|updatedAt|subject|priority` — сортування
+- `?sortDir=asc|desc` — напрямок сортування
+- `?page=1&pageSize=10` — пагінація
+
+### Ticket Messages
+| Метод | URL | Опис |
+|-------|-----|------|
+| GET | /api/tickets/:ticketId/messages | Повідомлення тікету |
+| POST | /api/tickets/:ticketId/messages | Додати повідомлення |
+| DELETE | /api/tickets/:ticketId/messages/:id | Видалити повідомлення |
+
+### Analytics
+| Метод | URL | Опис |
+|-------|-----|------|
+| GET | /api/analytics/tickets | Тікети з деталями автора і статусу (JOIN) |
+| GET | /api/analytics/tickets?search=текст | Пошук тікетів по темі (LIKE) |
+| GET | /api/analytics/tickets/count-by-status | Кількість тікетів по статусах (COUNT) |
+
 ---
-1. Перевірка сервера
-Сервер працює і повертає статус:
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/health" -Method GET
+
+## Демонстрація SQL Injection (навчальна)
+
+Endpoint `GET /api/analytics/tickets?search=` використовує рядкову конкатенацію:
+
+```typescript
+const sql = `... WHERE t.subject LIKE '%${search}%'`;
 ```
-Показати тільки код відповіді:
-```powershell
-(Invoke-WebRequest -Uri "http://localhost:3000/health" -Method GET).StatusCode
+
+**Чому це небезпечно:** користувацький ввід потрапляє напряму в SQL запит.
+
+**Приклад "поганого" вводу:**
 ```
+GET /api/analytics/tickets?search=%' OR '1'='1
+```
+Це змінить логіку WHERE і поверне всі записи незалежно від фільтру.
+
+**Виправлення:** параметризовані запити (плейсхолдери `?`) — буде реалізовано в лаб №5.
+
 ---
-2. Users
-Отримати список всіх користувачів:
+
+## Приклади запитів
+
+### Отримати всі тікети з фільтром:
 ```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/users" -Method GET
+Invoke-RestMethod -Uri "http://localhost:3000/api/tickets?priority=High&sortBy=createdAt&sortDir=desc" -Method GET
 ```
-Показати тільки код відповіді:
-```powershell
-(Invoke-WebRequest -Uri "http://localhost:3000/api/users" -Method GET).StatusCode
-```
-Отримати користувача за ID:
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/users/СЮДИ_ID" -Method GET
-```
-Показати тільки код відповіді:
-```powershell
-(Invoke-WebRequest -Uri "http://localhost:3000/api/users/СЮДИ_ID" -Method GET).StatusCode
-```
-Створити користувача:
+
+### Створити користувача:
 ```powershell
 Invoke-RestMethod -Uri "http://localhost:3000/api/users" -Method POST -ContentType "application/json" -Body '{"name": "Іван Петренко", "email": "ivan@example.com"}'
 ```
-Показати тільки код відповіді:
+
+### Створити тікет:
 ```powershell
-(Invoke-WebRequest -Uri "http://localhost:3000/api/users" -Method POST -ContentType "application/json" -Body '{"name": "Іван Петренко", "email": "ivan@example.com"}').StatusCode
+Invoke-RestMethod -Uri "http://localhost:3000/api/tickets" -Method POST -ContentType "application/json" -Body '{"subject": "Проблема з входом", "message": "Не можу увійти в систему", "priority": "High", "statusId": "status-1", "authorId": "user-1"}'
 ```
-Оновити користувача:
+
+### Аналітика — кількість тікетів по статусах:
 ```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/users/СЮДИ_ID" -Method PUT -ContentType "application/json" -Body '{"name": "Іван Оновлений", "email": "ivan.new@example.com"}'
+Invoke-RestMethod -Uri "http://localhost:3000/api/analytics/tickets/count-by-status" -Method GET
 ```
-Показати тільки код відповіді:
+
+### Пошук тікетів:
 ```powershell
-(Invoke-WebRequest -Uri "http://localhost:3000/api/users/СЮДИ_ID" -Method PUT -ContentType "application/json" -Body '{"name": "Іван Оновлений", "email": "ivan.new@example.com"}').StatusCode
+Invoke-RestMethod -Uri "http://localhost:3000/api/analytics/tickets?search=login" -Method GET
 ```
-Видалити користувача:
+
+### Спроба створити дублікат email (409 Conflict):
 ```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/users/СЮДИ_ID" -Method DELETE
+try { Invoke-RestMethod -Uri "http://localhost:3000/api/users" -Method POST -ContentType "application/json" -Body '{"name": "Test", "email": "alice@example.com"}' } catch { $_.ErrorDetails.Message }
 ```
-Показати тільки код відповіді:
-```powershell
-(Invoke-WebRequest -Uri "http://localhost:3000/api/users/СЮДИ_ID" -Method DELETE).StatusCode
-```
+
 ---
-3. Statuses
-Отримати список всіх статусів:
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/statuses" -Method GET
+
+## Структура проекту
+
 ```
-Показати тільки код відповіді:
-```powershell
-(Invoke-WebRequest -Uri "http://localhost:3000/api/statuses" -Method GET).StatusCode
-```
-Створити статус:
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/statuses" -Method POST -ContentType "application/json" -Body '{"name": "Pending", "color": "#9b59b6"}'
-```
-Показати тільки код відповіді:
-```powershell
-(Invoke-WebRequest -Uri "http://localhost:3000/api/statuses" -Method POST -ContentType "application/json" -Body '{"name": "Pending", "color": "#9b59b6"}').StatusCode
-```
----
-4. Tickets
-Отримати список всіх тікетів:
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/tickets" -Method GET
-```
-Показати тільки код відповіді:
-```powershell
-(Invoke-WebRequest -Uri "http://localhost:3000/api/tickets" -Method GET).StatusCode
-```
-Отримати тікет за ID:
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/tickets/СЮДИ_ID" -Method GET
-```
-Показати тільки код відповіді:
-```powershell
-(Invoke-WebRequest -Uri "http://localhost:3000/api/tickets/СЮДИ_ID" -Method GET).StatusCode
-```
-Створити тікет:
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/tickets" -Method POST -ContentType "application/json" -Body '{"subject": "Проблема з входом", "message": "Не можу увійти в систему вже другий день", "priority": "High", "statusId": "00000000-0000-0000-0001-000000000001", "authorId": "СЮДИ_ID_КОРИСТУВАЧА"}'
-```
-Показати тільки код відповіді:
-```powershell
-(Invoke-WebRequest -Uri "http://localhost:3000/api/tickets" -Method POST -ContentType "application/json" -Body '{"subject": "Проблема з входом", "message": "Не можу увійти в систему вже другий день", "priority": "High", "statusId": "00000000-0000-0000-0001-000000000001", "authorId": "СЮДИ_ID_КОРИСТУВАЧА"}').StatusCode
-```
-Оновити тікет повністю (PUT):
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/tickets/СЮДИ_ID" -Method PUT -ContentType "application/json" -Body '{"subject": "Оновлена тема", "message": "Оновлений текст повідомлення тут", "priority": "Low", "statusId": "00000000-0000-0000-0001-000000000002"}'
-```
-Показати тільки код відповіді:
-```powershell
-(Invoke-WebRequest -Uri "http://localhost:3000/api/tickets/СЮДИ_ID" -Method PUT -ContentType "application/json" -Body '{"subject": "Оновлена тема", "message": "Оновлений текст повідомлення тут", "priority": "Low", "statusId": "00000000-0000-0000-0001-000000000002"}').StatusCode
-```
-Часткове оновлення тікету (PATCH) — оновлює тільки передані поля:
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/tickets/СЮДИ_ID" -Method PATCH -ContentType "application/json" -Body '{"priority": "High"}'
-```
-Показати тільки код відповіді:
-```powershell
-(Invoke-WebRequest -Uri "http://localhost:3000/api/tickets/СЮДИ_ID" -Method PATCH -ContentType "application/json" -Body '{"priority": "High"}').StatusCode
-```
-Видалити тікет — soft delete, тікет позначається як видалений але залишається в пам'яті:
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/tickets/СЮДИ_ID" -Method DELETE
-```
-Показати тільки код відповіді:
-```powershell
-(Invoke-WebRequest -Uri "http://localhost:3000/api/tickets/СЮДИ_ID" -Method DELETE).StatusCode
-```
----
-5. Фільтрація, сортування, пагінація
-Фільтрація за статусом:
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/tickets?statusId=00000000-0000-0000-0001-000000000001" -Method GET
-```
-Показати тільки код відповіді:
-```powershell
-(Invoke-WebRequest -Uri "http://localhost:3000/api/tickets?statusId=00000000-0000-0000-0001-000000000001" -Method GET).StatusCode
-```
-Фільтрація за пріоритетом:
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/tickets?priority=High" -Method GET
-```
-Показати тільки код відповіді:
-```powershell
-(Invoke-WebRequest -Uri "http://localhost:3000/api/tickets?priority=High" -Method GET).StatusCode
-```
-Сортування за пріоритетом від високого до низького:
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/tickets?sortBy=priority&sortDir=desc" -Method GET
-```
-Показати тільки код відповіді:
-```powershell
-(Invoke-WebRequest -Uri "http://localhost:3000/api/tickets?sortBy=priority&sortDir=desc" -Method GET).StatusCode
-```
-Сортування за датою створення:
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/tickets?sortBy=createdAt&sortDir=asc" -Method GET
-```
-Показати тільки код відповіді:
-```powershell
-(Invoke-WebRequest -Uri "http://localhost:3000/api/tickets?sortBy=createdAt&sortDir=asc" -Method GET).StatusCode
-```
-Пагінація — перша сторінка по 2 записи:
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/tickets?page=1&pageSize=2" -Method GET
-```
-Показати тільки код відповіді:
-```powershell
-(Invoke-WebRequest -Uri "http://localhost:3000/api/tickets?page=1&pageSize=2" -Method GET).StatusCode
-```
-Пагінація — друга сторінка:
-```powershell
-Invoke-RestMethod -Uri "http://localhost:3000/api/tickets?page=2&pageSize=2" -Method GET
-```
-Показати тільки код відповіді:
-```powershell
-(Invoke-WebRequest -Uri "http://localhost:3000/api/tickets?page=2&pageSize=2" -Method GET).StatusCode
-```
----
-6. Валідація — 400 Bad Request
-Спроба створити тікет з некоректними даними — повертає 400 з описом всіх помилок:
-```powershell
-try { Invoke-RestMethod -Uri "http://localhost:3000/api/tickets" -Method POST -ContentType "application/json" -Body '{"subject": "ab"}' } catch { $_.ErrorDetails.Message }
-```
-Показати тільки код відповіді:
-```powershell
-try { Invoke-WebRequest -Uri "http://localhost:3000/api/tickets" -Method POST -ContentType "application/json" -Body '{"subject": "ab"}' } catch { $_.Exception.Response.StatusCode.value__ }
-```
-Спроба створити користувача без обов'язкових полів:
-```powershell
-try { Invoke-RestMethod -Uri "http://localhost:3000/api/users" -Method POST -ContentType "application/json" -Body '{}' } catch { $_.ErrorDetails.Message }
-```
-Показати тільки код відповіді:
-```powershell
-try { Invoke-WebRequest -Uri "http://localhost:3000/api/users" -Method POST -ContentType "application/json" -Body '{}' } catch { $_.Exception.Response.StatusCode.value__ }
-```
----
-7. Помилка 404 Not Found
-Запит до неіснуючого тікету:
-```powershell
-try { Invoke-RestMethod -Uri "http://localhost:3000/api/tickets/non-existing-id" -Method GET } catch { $_.ErrorDetails.Message }
-```
-Показати тільки код відповіді:
-```powershell
-try { Invoke-WebRequest -Uri "http://localhost:3000/api/tickets/non-existing-id" -Method GET } catch { $_.Exception.Response.StatusCode.value__ }
-```
-Запит до неіснуючого користувача:
-```powershell
-try { Invoke-RestMethod -Uri "http://localhost:3000/api/users/non-existing-id" -Method GET } catch { $_.ErrorDetails.Message }
-```
-Показати тільки код відповіді:
-```powershell
-try { Invoke-WebRequest -Uri "http://localhost:3000/api/users/non-existing-id" -Method GET } catch { $_.Exception.Response.StatusCode.value__ }
-```
----
-8. Тести
-Запуск всіх unit-тестів:
-```bash
-npm test
-```
----
-Структура проекту
-```
-src/
-├── controllers/       # Обробка HTTP запитів
-├── services/          # Бізнес-логіка
-├── repositories/      # Зберігання даних в пам'яті
-├── routes/            # Маршрути API
-├── dtos/              # DTO для запитів і відповідей
-├── models/            # Моделі даних
-├── validators/        # Валідація вхідних даних
-├── middleware/        # Logger, error handler
-├── errors/            # Клас ApiError
-├── swagger.ts         # Конфігурація Swagger
-├── app.ts             # Налаштування Express
-└── index.ts           # Точка входу
+backend/
+├── src/
+│   ├── controllers/       # Обробка HTTP запитів
+│   ├── services/          # Бізнес-логіка
+│   ├── repositories/      # Доступ до SQLite
+│   ├── routes/            # Маршрути API
+│   ├── db/                # SQLite підключення та міграції
+│   │   ├── db.ts          # Відкриття файлу БД
+│   │   ├── dbClient.ts    # Обгортки all/get/run
+│   │   ├── migrate.ts     # Система міграцій
+│   │   └── seed.ts        # Тестові дані
+│   ├── dtos/              # DTO для запитів і відповідей
+│   ├── models/            # Моделі даних
+│   ├── validators/        # Валідація вхідних даних
+│   ├── middleware/        # Logger, error handler
+│   ├── errors/            # Клас ApiError
+│   ├── app.ts             # Налаштування Express
+│   └── index.ts           # Точка входу
+├── migrations/            # SQL файли міграцій
+├── data/                  # SQLite файл (не в репозиторії)
+└── .gitignore
 ```

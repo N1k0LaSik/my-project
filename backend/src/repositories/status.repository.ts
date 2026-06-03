@@ -1,38 +1,40 @@
+import { all, get, run } from "../db/dbClient";
 import { Status } from "../models/status.model";
-import { v4 as uuid } from "uuid";
-
-// Дефолтні статуси одразу в пам'яті
-const statuses: Status[] = [
-  { id: "00000000-0000-0000-0001-000000000001", name: "Open", color: "#3498db" },
-  { id: "00000000-0000-0000-0001-000000000002", name: "In Progress", color: "#f39c12" },
-  { id: "00000000-0000-0000-0001-000000000003", name: "Resolved", color: "#2ecc71" },
-  { id: "00000000-0000-0000-0001-000000000004", name: "Closed", color: "#95a5a6" },
-];
 
 export const StatusRepository = {
-  findAll: () => [...statuses],
-
-  findById: (id: string) => statuses.find(s => s.id === id),
-
-  findByName: (name: string) =>
-    statuses.find(s => s.name.toLowerCase() === name.toLowerCase()),
-
-  create: (status: Status) => {
-    statuses.push(status);
-    return status;
+  findAll: (): Promise<Status[]> => {
+    return all<Status>("SELECT id, name, color FROM Statuses ORDER BY name ASC;");
   },
 
-  update: (id: string, data: Partial<Omit<Status, "id">>) => {
-    const status = statuses.find(s => s.id === id);
-    if (!status) return null;
-    Object.assign(status, data);
-    return status;
+  findById: (id: string): Promise<Status | undefined> => {
+    return get<Status>(`SELECT id, name, color FROM Statuses WHERE id = '${id}';`);
   },
 
-  delete: (id: string) => {
-    const index = statuses.findIndex(s => s.id === id);
-    if (index === -1) return false;
-    statuses.splice(index, 1);
-    return true;
+  findByName: (name: string): Promise<Status | undefined> => {
+    return get<Status>(`SELECT id, name, color FROM Statuses WHERE name = '${name}';`);
+  },
+
+  create: async (status: Status): Promise<Status> => {
+    await run(`
+      INSERT INTO Statuses (id, name, color)
+      VALUES ('${status.id}', '${status.name.replace(/'/g, "''")}', '${status.color}');
+    `);
+    return (await get<Status>(`SELECT id, name, color FROM Statuses WHERE id = '${status.id}';`))!;
+  },
+
+  update: async (id: string, data: Partial<Omit<Status, "id">>): Promise<Status | null> => {
+    const fields: string[] = [];
+    if (data.name !== undefined) fields.push(`name = '${data.name.replace(/'/g, "''")}'`);
+    if (data.color !== undefined) fields.push(`color = '${data.color}'`);
+    if (fields.length === 0) return null;
+
+    const result = await run(`UPDATE Statuses SET ${fields.join(", ")} WHERE id = '${id}';`);
+    if (result.changes === 0) return null;
+    return (await get<Status>(`SELECT id, name, color FROM Statuses WHERE id = '${id}';`)) ?? null;
+  },
+
+  delete: async (id: string): Promise<boolean> => {
+    const result = await run(`DELETE FROM Statuses WHERE id = '${id}';`);
+    return result.changes > 0;
   },
 };

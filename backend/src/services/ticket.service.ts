@@ -20,22 +20,22 @@ function toDto(t: Ticket): TicketResponseDto {
 }
 
 export const TicketService = {
-  getAll: (filters: TicketFilters) => {
-    const { items, total } = TicketRepository.findAll(filters);
+  getAll: async (filters: TicketFilters) => {
+    const { items, total } = await TicketRepository.findAll(filters);
     return { items: items.map(toDto), total };
   },
 
-  getById: (id: string) => {
-    const ticket = TicketRepository.findById(id);
+  getById: async (id: string) => {
+    const ticket = await TicketRepository.findById(id);
     if (!ticket) return null;
     return toDto(ticket);
   },
 
-  create: (dto: CreateTicketRequestDto) => {
-    const author = UserRepository.findById(dto.authorId);
+  create: async (dto: CreateTicketRequestDto) => {
+    const author = await UserRepository.findById(dto.authorId);
     if (!author) throw new ApiError(404, "NOT_FOUND", "Author (user) not found");
 
-    const status = StatusRepository.findById(dto.statusId);
+    const status = await StatusRepository.findById(dto.statusId);
     if (!status) throw new ApiError(404, "NOT_FOUND", "Status not found");
 
     const now = new Date().toISOString();
@@ -47,16 +47,16 @@ export const TicketService = {
       deletedAt: null,
     };
 
-    return toDto(TicketRepository.create(ticket));
+    return toDto(await TicketRepository.create(ticket));
   },
 
-  update: (id: string, dto: UpdateTicketRequestDto) => {
+  update: async (id: string, dto: UpdateTicketRequestDto) => {
     if (dto.statusId) {
-      const status = StatusRepository.findById(dto.statusId);
+      const status = await StatusRepository.findById(dto.statusId);
       if (!status) throw new ApiError(404, "NOT_FOUND", "Status not found");
     }
 
-    const updated = TicketRepository.update(id, {
+    const updated = await TicketRepository.update(id, {
       ...dto,
       updatedAt: new Date().toISOString(),
     });

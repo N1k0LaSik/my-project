@@ -17,18 +17,19 @@ function toDto(m: TicketMessage): TicketMessageResponseDto {
 }
 
 export const TicketMessageService = {
-  getByTicketId: (ticketId: string) => {
-    const ticket = TicketRepository.findById(ticketId);
+  getByTicketId: async (ticketId: string) => {
+    const ticket = await TicketRepository.findById(ticketId);
     if (!ticket) throw new ApiError(404, "NOT_FOUND", "Ticket not found");
 
-    return TicketMessageRepository.findByTicketId(ticketId).map(toDto);
+    const messages = await TicketMessageRepository.findByTicketId(ticketId);
+    return messages.map(toDto);
   },
 
-  create: (ticketId: string, dto: CreateTicketMessageRequestDto) => {
-    const ticket = TicketRepository.findById(ticketId);
+  create: async (ticketId: string, dto: CreateTicketMessageRequestDto) => {
+    const ticket = await TicketRepository.findById(ticketId);
     if (!ticket) throw new ApiError(404, "NOT_FOUND", "Ticket not found");
 
-    const author = UserRepository.findById(dto.authorId);
+    const author = await UserRepository.findById(dto.authorId);
     if (!author) throw new ApiError(404, "NOT_FOUND", "Author (user) not found");
 
     const message: TicketMessage = {
@@ -39,14 +40,14 @@ export const TicketMessageService = {
       createdAt: new Date().toISOString(),
     };
 
-    return toDto(TicketMessageRepository.create(message));
+    return toDto(await TicketMessageRepository.create(message));
   },
 
-  delete: (ticketId: string, messageId: string) => {
-    const ticket = TicketRepository.findById(ticketId);
+  delete: async (ticketId: string, messageId: string) => {
+    const ticket = await TicketRepository.findById(ticketId);
     if (!ticket) throw new ApiError(404, "NOT_FOUND", "Ticket not found");
 
-    const message = TicketMessageRepository.findById(messageId);
+    const message = await TicketMessageRepository.findById(messageId);
     if (!message || message.ticketId !== ticketId) {
       throw new ApiError(404, "NOT_FOUND", "Message not found");
     }
