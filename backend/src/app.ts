@@ -3,6 +3,7 @@ import cors from "cors";
 import swaggerUi from "swagger-ui-express";
 import { logger } from "./middleware/logger.middleware";
 import { errorHandler } from "./middleware/error-handler.middleware";
+import { securityHeaders } from "./middleware/security-headers.middleware";
 import { userRoutes } from "./routes/user.routes";
 import { statusRoutes } from "./routes/status.routes";
 import { ticketRoutes } from "./routes/ticket.routes";
@@ -23,12 +24,13 @@ const allowedOrigins = [
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true); // Postman / curl
+    if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error(`CORS: origin '${origin}' not allowed`), false);
   },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  // Додали X-Demo-UserId щоб браузер дозволяв його передавати
+  allowedHeaders: ["Content-Type", "Authorization", "X-Demo-UserId"],
   credentials: false,
 };
 
@@ -36,6 +38,9 @@ app.use(express.json());
 app.use(cors(corsOptions));
 app.options("/{*path}", cors(corsOptions));
 app.use(logger);
+
+// ─── Security headers — підключаємо глобально ────────────────────────────────
+app.use(securityHeaders);
 
 app.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok" });

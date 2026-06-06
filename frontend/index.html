@@ -8,6 +8,14 @@
 </head>
 <body>
 
+<div id="demoAuthBar" style="background:#1e293b;color:#e2e8f0;padding:8px 16px;font-size:0.85rem;display:flex;align-items:center;gap:12px;">
+  <span>Demo Auth:</span>
+  <select id="demoUserSelect" style="background:#334155;color:#e2e8f0;border:1px solid #475569;border-radius:4px;padding:4px 8px;">
+    <option value="">-- Оберіть користувача --</option>
+  </select>
+  <span id="demoUserLabel" style="color:#94a3b8;font-size:0.8rem;">(для POST/PUT/DELETE)</span>
+</div>
+
 <div id="notice" class="notice"></div>
 
 <h1>Заявки в техпідтримку</h1>
@@ -43,13 +51,6 @@
       <textarea id="message" placeholder="Мінімум 10 символів"></textarea>
       <div class="field-error" id="messageError"></div>
 
-      <label for="author">Author</label>
-      <input type="text" id="author" placeholder="Ім'я автора" />
-      <div class="field-error" id="authorError"></div>
-
-      <label for="email">Email</label>
-      <input type="email" id="email" placeholder="author@example.com" />
-      <div class="field-error" id="emailError"></div>
 
       <div class="form-actions">
         <button type="submit" id="submitBtn" disabled>Зберегти</button>

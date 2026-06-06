@@ -1,4 +1,4 @@
-import { all, get } from "../db/dbClient";
+import { all } from "../db/dbClient";
 
 export type TicketWithDetails = {
   id: string;
@@ -22,47 +22,43 @@ export type StatusCount = {
 };
 
 export const AnalyticsRepository = {
-  // JOIN: тікети з деталями автора і статусу
   findTicketsWithDetails: (search?: string): Promise<TicketWithDetails[]> => {
-    const searchCondition = search
-      ? `AND t.subject LIKE '%${search}%'`
-      : "";
+    if (search) {
+      return all<TicketWithDetails>(
+        `SELECT
+          t.id, t.subject, t.message, t.priority, t.createdAt, t.updatedAt,
+          u.id AS authorId, u.name AS authorName, u.email AS authorEmail,
+          s.id AS statusId, s.name AS statusName, s.color AS statusColor
+         FROM Tickets t
+         JOIN Users u ON u.id = t.authorId
+         JOIN Statuses s ON s.id = t.statusId
+         WHERE t.deletedAt IS NULL AND t.subject LIKE ?
+         ORDER BY t.createdAt DESC;`,
+        [`%${search}%`]
+      );
+    }
 
-    const sql = `
-      SELECT
-        t.id,
-        t.subject,
-        t.message,
-        t.priority,
-        t.createdAt,
-        t.updatedAt,
-        u.id AS authorId,
-        u.name AS authorName,
-        u.email AS authorEmail,
-        s.id AS statusId,
-        s.name AS statusName,
-        s.color AS statusColor
-      FROM Tickets t
-      JOIN Users u ON u.id = t.authorId
-      JOIN Statuses s ON s.id = t.statusId
-      WHERE t.deletedAt IS NULL ${searchCondition}
-      ORDER BY t.createdAt DESC;
-    `;
-
-    return all<TicketWithDetails>(sql);
+    return all<TicketWithDetails>(
+      `SELECT
+        t.id, t.subject, t.message, t.priority, t.createdAt, t.updatedAt,
+        u.id AS authorId, u.name AS authorName, u.email AS authorEmail,
+        s.id AS statusId, s.name AS statusName, s.color AS statusColor
+       FROM Tickets t
+       JOIN Users u ON u.id = t.authorId
+       JOIN Statuses s ON s.id = t.statusId
+       WHERE t.deletedAt IS NULL
+       ORDER BY t.createdAt DESC;`
+    );
   },
 
-  // АГРЕГАЦІЯ: кількість тікетів по кожному статусу
   countTicketsByStatus: (): Promise<StatusCount[]> => {
-    return all<StatusCount>(`
-      SELECT
-        s.id AS statusId,
-        s.name AS statusName,
-        COUNT(t.id) AS count
-      FROM Statuses s
-      LEFT JOIN Tickets t ON t.statusId = s.id AND t.deletedAt IS NULL
-      GROUP BY s.id, s.name
-      ORDER BY count DESC;
-    `);
+    return all<StatusCount>(
+      `SELECT
+        s.id AS statusId, s.name AS statusName, COUNT(t.id) AS count
+       FROM Statuses s
+       LEFT JOIN Tickets t ON t.statusId = s.id AND t.deletedAt IS NULL
+       GROUP BY s.id, s.name
+       ORDER BY count DESC;`
+    );
   },
 };

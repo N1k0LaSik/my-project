@@ -1,12 +1,18 @@
 import { NextFunction, Request, Response } from "express";
 import { ApiError } from "../errors/api-error";
 
+/**
+ * Централізований обробник помилок.
+ * У production не розкриває stack trace клієнту — тільки логує на сервері.
+ */
 export function errorHandler(
   err: unknown,
   _req: Request,
   res: Response,
   _next: NextFunction
 ) {
+  const isDev = process.env.NODE_ENV !== "production";
+
   if (err instanceof ApiError) {
     return res.status(err.statusCode).json({
       error: {
@@ -49,13 +55,16 @@ export function errorHandler(
     });
   }
 
+  // Повні деталі — тільки в лог на сервері, не клієнту
   console.error("Unhandled error:", err);
 
   return res.status(500).json({
     error: {
       code: "INTERNAL_SERVER_ERROR",
       message: "Unexpected server error",
-      details: [],
+      // В dev — додаємо message для зручності налагодження
+      // В production — undefined не включається в JSON
+      ...(isDev && err instanceof Error ? { details: [err.message] } : {}),
     },
   });
 }

@@ -50,6 +50,7 @@ export const TicketService = {
     return toDto(await TicketRepository.create(ticket));
   },
 
+  // Для адміна — без перевірки власника
   update: async (id: string, dto: UpdateTicketRequestDto) => {
     if (dto.statusId) {
       const status = await StatusRepository.findById(dto.statusId);
@@ -65,5 +66,25 @@ export const TicketService = {
     return toDto(updated);
   },
 
+  // IDOR-захист: перевірка власника на рівні БД-запиту
+  updateByOwner: async (id: string, ownerUserId: string, dto: UpdateTicketRequestDto) => {
+    if (dto.statusId) {
+      const status = await StatusRepository.findById(dto.statusId);
+      if (!status) throw new ApiError(404, "NOT_FOUND", "Status not found");
+    }
+
+    const updated = await TicketRepository.updateByOwner(id, ownerUserId, {
+      ...dto,
+      updatedAt: new Date().toISOString(),
+    });
+
+    if (!updated) return null;
+    return toDto(updated);
+  },
+
   delete: (id: string) => TicketRepository.softDelete(id),
+
+  // IDOR-захист: перевірка власника на рівні БД-запиту
+  deleteByOwner: (id: string, ownerUserId: string) =>
+    TicketRepository.softDeleteByOwner(id, ownerUserId),
 };

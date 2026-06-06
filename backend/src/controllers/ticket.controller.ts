@@ -38,7 +38,9 @@ export const getTicketById = async (req: Request, res: Response, next: NextFunct
 export const createTicket = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const dto = validateCreateTicketDto(req.body);
-    const ticket = await TicketService.create(dto);
+    // Власник береться з req.user (встановлений demoAuth), не з тіла запиту
+    const authorId = req.user!.id;
+    const ticket = await TicketService.create({ ...dto, authorId });
     return res.status(201).json(ticket);
   } catch (err) {
     return next(err);
@@ -48,8 +50,10 @@ export const createTicket = async (req: Request, res: Response, next: NextFuncti
 export const updateTicket = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const dto = validateUpdateTicketDto(req.body);
-    const ticket = await TicketService.update(String(req.params.id), dto);
-    if (!ticket) return next(new ApiError(404, "NOT_FOUND", "Ticket not found"));
+    const ownerUserId = req.user!.id;
+    // updateByOwner повертає null якщо тікет не існує АБО належить іншому користувачу
+    const ticket = await TicketService.updateByOwner(String(req.params.id), ownerUserId, dto);
+    if (!ticket) return next(new ApiError(404, "NOT_FOUND", "Ticket not found or access denied"));
     return res.status(200).json(ticket);
   } catch (err) {
     return next(err);
@@ -58,8 +62,10 @@ export const updateTicket = async (req: Request, res: Response, next: NextFuncti
 
 export const deleteTicket = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const deleted = await TicketService.delete(String(req.params.id));
-    if (!deleted) return next(new ApiError(404, "NOT_FOUND", "Ticket not found"));
+    const ownerUserId = req.user!.id;
+    // deleteByOwner повертає false якщо тікет не існує АБО належить іншому користувачу
+    const deleted = await TicketService.deleteByOwner(String(req.params.id), ownerUserId);
+    if (!deleted) return next(new ApiError(404, "NOT_FOUND", "Ticket not found or access denied"));
     return res.status(204).send();
   } catch (err) {
     return next(err);

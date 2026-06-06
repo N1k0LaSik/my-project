@@ -47,6 +47,22 @@ export function invalidateCache(pattern?: string): void {
 }
 
 
+// ─── Demo Auth ────────────────────────────────────────────────────────────────
+
+let _currentUserId: string | null = null;
+
+export function setCurrentUserId(id: string | null): void {
+  _currentUserId = id;
+}
+
+export function getCurrentUserId(): string | null {
+  return _currentUserId;
+}
+
+function authHeaders(): Record<string, string> {
+  return _currentUserId ? { "X-Demo-UserId": _currentUserId } : {};
+}
+
 // ─── Core request function ────────────────────────────────────────────────────
 
 async function request<T>(
@@ -58,7 +74,13 @@ async function request<T>(
 
   let response: Response;
   try {
-    response = await fetch(url, { ...options, signal });
+    const method = (options.method ?? "GET").toUpperCase();
+    const needsAuth = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+    const mergedHeaders = {
+      ...(options.headers as Record<string, string> ?? {}),
+      ...(needsAuth ? authHeaders() : {}),
+    };
+    response = await fetch(url, { ...options, headers: mergedHeaders, signal });
   } catch (e: unknown) {
     const isAbort =
       e instanceof DOMException && e.name === "AbortError";
@@ -96,7 +118,7 @@ async function request<T>(
       return rawText as unknown as T;
     }
   }
-
+  
   // Parse error response
   let payload: { error?: { code?: string; message?: string; details?: Array<{ field?: string; message: string }> } } | null = null;
   try {

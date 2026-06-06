@@ -34,7 +34,12 @@ export function renderListStatus(
   } else if (status === "empty") {
     el.innerHTML = `<span class="status-empty">Заявок ще немає</span>`;
   } else if (status === "error") {
-    el.innerHTML = `<span class="status-error">Помилка завантаження: ${err?.message ?? "невідома"}</span>`;
+    // Повідомлення про помилку через textContent — не innerHTML
+    const span = document.createElement("span");
+    span.className = "status-error";
+    span.textContent = `Помилка завантаження: ${err?.message ?? "невідома"}`;
+    el.innerHTML = "";
+    el.appendChild(span);
   } else {
     el.innerHTML = "";
   }
@@ -42,17 +47,17 @@ export function renderListStatus(
 
 // ─── Table ────────────────────────────────────────────────────────────────────
 
+
 export function renderTable(
   tickets: TicketListItemDto[],
   statuses: StatusDto[],
   users: UserDto[]
 ): void {
   const tbody = document.getElementById("tableBody")!;
+  tbody.innerHTML = "";
 
-  const getStatus = (id: string) =>
-    statuses.find((s) => s.id === id)?.name ?? id;
-  const getUser = (id: string) =>
-    users.find((u) => u.id === id)?.name ?? id;
+  const getStatus = (id: string) => statuses.find((s) => s.id === id)?.name ?? id;
+  const getUser = (id: string) => users.find((u) => u.id === id)?.name ?? id;
 
   const priorityBadge: Record<string, string> = {
     High: "badge badge--high",
@@ -60,22 +65,51 @@ export function renderTable(
     Low: "badge badge--low",
   };
 
-  tbody.innerHTML = tickets
-    .map(
-      (t) => `
-    <tr>
-      <td>${t.subject}</td>
-      <td>${getStatus(t.statusId)}</td>
-      <td><span class="${priorityBadge[t.priority] ?? "badge"}">${t.priority}</span></td>
-      <td>${getUser(t.authorId)}</td>
-      <td>${new Date(t.createdAt).toLocaleDateString("uk-UA")}</td>
-      <td>
-        <button class="btn btn--edit" data-id="${t.id}">Редагувати</button>
-        <button class="btn btn--delete" data-id="${t.id}">Видалити</button>
-      </td>
-    </tr>`
-    )
-    .join("");
+  for (const t of tickets) {
+    const tr = document.createElement("tr");
+
+    // subject — дані користувача → textContent (не innerHTML!)
+    const tdSubject = document.createElement("td");
+    tdSubject.textContent = t.subject;
+
+    // status name → textContent
+    const tdStatus = document.createElement("td");
+    tdStatus.textContent = getStatus(t.statusId);
+
+    // priority — через textContent
+    const tdPriority = document.createElement("td");
+    const badge = document.createElement("span");
+    badge.className = priorityBadge[t.priority] ?? "badge";
+    badge.textContent = t.priority;
+    tdPriority.appendChild(badge);
+
+    // author name — дані з БД → textContent
+    const tdAuthor = document.createElement("td");
+    tdAuthor.textContent = getUser(t.authorId);
+
+    // date — форматована дата
+    const tdDate = document.createElement("td");
+    tdDate.textContent = new Date(t.createdAt).toLocaleDateString("uk-UA");
+
+    // кнопки — data-id через .dataset, не через innerHTML
+    const tdActions = document.createElement("td");
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "btn btn--edit";
+    editBtn.dataset.id = t.id;
+    editBtn.textContent = "Редагувати";
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "btn btn--delete";
+    deleteBtn.dataset.id = t.id;
+    deleteBtn.textContent = "Видалити";
+
+    tdActions.appendChild(editBtn);
+    tdActions.appendChild(deleteBtn);
+
+    tr.append(tdSubject, tdStatus, tdPriority, tdAuthor, tdDate, tdActions);
+    tbody.appendChild(tr);
+  }
 }
 
 // ─── Form state ───────────────────────────────────────────────────────────────
@@ -119,12 +153,22 @@ export function populateStatuses(
   statuses: StatusDto[],
   selectIds: string[]
 ): void {
-  const options =
-    `<option value="">Оберіть статус</option>` +
-    statuses.map((s) => `<option value="${s.id}">${s.name}</option>`).join("");
   selectIds.forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = options;
+    const el = document.getElementById(id) as HTMLSelectElement | null;
+    if (!el) return;
+    el.innerHTML = "";
+
+    const defaultOpt = document.createElement("option");
+    defaultOpt.value = "";
+    defaultOpt.textContent = "Оберіть статус";
+    el.appendChild(defaultOpt);
+
+    for (const s of statuses) {
+      const opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = s.name;
+      el.appendChild(opt);
+    }
   });
 }
 
